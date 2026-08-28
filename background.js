@@ -17,15 +17,26 @@ async function apiRequest(message) {
   const settings = await chrome.storage.sync.get(["webAppUrl", "token"]);
   const url = normalizeWebAppUrl(settings.webAppUrl);
   if (!settings.token) throw new Error("أدخل رمز الحماية في إعدادات الإضافة.");
+
   if (message.type === "GET_SHEETS") {
     const requestUrl = new URL(url);
     requestUrl.searchParams.set("action", "sheets");
     requestUrl.searchParams.set("token", settings.token);
     return readJson(await fetch(requestUrl.toString(), { redirect: "follow" }));
   }
+
+  if (message.type === "GET_SHEET_COLUMNS") {
+    const requestUrl = new URL(url);
+    requestUrl.searchParams.set("action", "columns");
+    requestUrl.searchParams.set("token", settings.token);
+    requestUrl.searchParams.set("sheetName", String(message.sheetName || ""));
+    return readJson(await fetch(requestUrl.toString(), { redirect: "follow" }));
+  }
+
   if (message.type === "SAVE_CONTACT") {
     return readJson(await fetch(url, { method:"POST", redirect:"follow", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify({token:settings.token,action:"save",sheetName:message.sheetName,mobile:message.mobile,sourceUrl:message.sourceUrl}) }));
   }
+
   throw new Error("طلب غير معروف.");
 }
 async function isToolEnabled() {
@@ -53,7 +64,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   setTimeout(() => autoSaveHarajContact(tabId, tab.url), 500);
 });
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (!["GET_SHEETS", "SAVE_CONTACT"].includes(message && message.type)) return;
+  if (!["GET_SHEETS", "GET_SHEET_COLUMNS", "SAVE_CONTACT"].includes(message && message.type)) return;
   apiRequest(message).then(data => sendResponse({ok:true,data:data})).catch(error => sendResponse({ok:false,error:error.message}));
   return true;
 });

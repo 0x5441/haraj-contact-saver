@@ -1,1 +1,84 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>حفظ رقم حراج</title><link rel="stylesheet" href="popup.css"></head><body><main><h1>حفظ رقم حراج</h1><label for="webAppUrl">رابط Apps Script</label><input id="webAppUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec"><label for="token">رمز الحماية</label><input id="token" type="password" placeholder="نفس الرمز الموجود في Code.gs"><button id="connect" class="secondary">حفظ الاتصال وجلب الشيتات</button><label for="sheetName">الشيت / المدينة</label><select id="sheetName"><option value="">اضغط جلب الشيتات أولاً</option></select><button id="saveContact" class="primary">اضغط الزر واحفظ الرقم</button><button id="toggleTool" class="warning">إيقاف الأداة</button><p id="status" role="status"></p><p id="extensionVersion"></p></main><script src="popup.js"></script></body></html>
+<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>حفظ رقم حراج</title><link rel="stylesheet" href="popup.css"></head><body><main><h1>حفظ رقم حراج</h1>
+  <div class="tabs" aria-label="Tabs">
+    <button class="tab active" data-tab="collect">جمع الأرقام</button>
+    <button class="tab" data-tab="providers">التواصل مع المزودين</button>
+  </div>
+
+  <section class="tab-panel active" data-panel="collect">
+    <label for="webAppUrl">رابط Apps Script</label>
+    <input id="webAppUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+    <label for="token">رمز الحماية</label>
+    <input id="token" type="password" placeholder="نفس الرمز الموجود في Code.gs">
+    <button id="connect" class="secondary">حفظ الاتصال وجلب الشيتات</button>
+    <label for="sheetName">الشيت / المدينة</label>
+    <select id="sheetName"><option value="">اضغط جلب الشيتات أولاً</option></select>
+    <button id="saveContact" class="primary">اضغط الزر واحفظ الرقم</button>
+    <button id="toggleTool" class="warning">إيقاف الأداة</button>
+  </section>
+
+  <section class="tab-panel" data-panel="providers">
+    <label for="providerSheetName">اختيار الشيت</label>
+    <select id="providerSheetName"><option value="">اختر الشيت</option></select>
+
+    <label for="phoneColumnSelect">اختيار عمود الأرقام</label>
+    <select id="phoneColumnSelect"><option value="">اختر عمود الجوال</option></select>
+
+    <label for="statusColumnSelect">اختيار عمود حالة التواصل</label>
+    <select id="statusColumnSelect"><option value="">اختر عمود الحالة</option></select>
+
+    <label for="lastContactColumnSelect">اختيار عمود آخر تواصل</label>
+    <select id="lastContactColumnSelect"><option value="">غير موجود</option></select>
+
+    <label for="citySelect">المدينة</label>
+    <select id="citySelect"><option value="">كل المدن</option></select>
+
+    <label for="serviceTypeSelect">نوع الخدمة</label>
+    <select id="serviceTypeSelect">
+      <option value="وايتات مياه">وايتات مياه</option>
+      <option value="خدمة أخرى">خدمة أخرى</option>
+    </select>
+
+    <label for="customServiceInput">خدمة أخرى</label>
+    <input id="customServiceInput" type="text" placeholder="اكتب اسم الخدمة إذا لزم الأمر">
+
+    <label for="templateSelect">قالب الرسالة</label>
+    <select id="templateSelect">
+      <option value="default">وايتات مياه</option>
+    </select>
+
+    <label for="messageText">نص الرسالة</label>
+    <textarea id="messageText" rows="5">أنا مسوق لخدمات وايتات المياه وعندي عملاء يحتاجون توصيل مياه في {المدينة}
+
+طريقة العمل بسيطة إذا جاءني طلب أرسله لك مع الموقع والتفاصيل وأنت تعطيني سعرك وبعدها أضيف عمولتي وأعرض السعر النهائي على العميل
+
+ما راح تدفع لي أي مبلغ مقدم ولا توجد رسوم اشتراك والعمولة تكون فقط على الطلبات التي تتم فعليًا عن طريقي وتكون واضحة ومتفق عليها قبل تنفيذ الطلب
+
+إذا وافق العميل أرسل لك الموقع وعند وصولك للموقع ترسل لي وصلت وبعدها أعطيك رقم العميل للتنسيق واستلام المبلغ منه
+
+إذا الطريقة مناسبة لك رد علي بموافق ونبدأ نتعاون</textarea>
+
+<div class="mini-grid">
+  <div><label>رقم الصف الحالي</label><div id="currentRowValue" class="value-box">0</div></div>
+  <div><label>رقم الجوال الحالي</label><div id="currentPhoneValue" class="value-box">-</div></div>
+  <div><label>الأرقام المتبقية</label><div id="remainingCountValue" class="value-box">0</div></div>
+  <div><label>ابدأ من الصف</label><input id="startRowInput" type="number" min="1" value="1"></div>
+</div>
+
+<div class="action-grid">
+  <button id="saveStartRow" class="secondary">حفظ نقطة البداية</button>
+  <button id="prevRowBtn" class="secondary">السابق</button>
+  <button id="nextRowBtn" class="primary">التالي</button>
+  <button id="openWhatsAppBtn" class="secondary">فتح الرقم في واتساب</button>
+  <button id="writeMessageBtn" class="secondary">كتابة الرسالة</button>
+  <button id="sendCurrentMessageBtn" class="primary">إرسال الرسالة الحالية</button>
+  <button id="retryContactBtn" class="secondary">إعادة المحاولة</button>
+  <button id="skipContactBtn" class="warning">تخطي الرقم</button>
+  <button id="markManualBtn" class="secondary">تعليم كمُرسل يدويًا</button>
+  <button id="stopProcessBtn" class="danger">إيقاف العملية</button>
+</div>
+  </section>
+
+  <p id="status" role="status"></p>
+  <p id="extensionVersion"></p>
+</main>
+<script src="popup.js"></script></body></html>
