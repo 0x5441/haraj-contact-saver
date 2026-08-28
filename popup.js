@@ -1,6 +1,10 @@
-const webAppUrlInput=document.querySelector("#webAppUrl"),tokenInput=document.querySelector("#token"),sheetSelect=document.querySelector("#sheetName"),connectButton=document.querySelector("#connect"),saveButton=document.querySelector("#saveContact"),toggleToolButton=document.querySelector("#toggleTool"),statusElement=document.querySelector("#status"),versionElement=document.querySelector("#extensionVersion"),providerSheetName=document.querySelector("#providerSheetName"),phoneColumnSelect=document.querySelector("#phoneColumnSelect"),statusColumnSelect=document.querySelector("#statusColumnSelect"),lastContactColumnSelect=document.querySelector("#lastContactColumnSelect"),citySelect=document.querySelector("#citySelect"),serviceTypeSelect=document.querySelector("#serviceTypeSelect"),customServiceInput=document.querySelector("#customServiceInput"),templateSelect=document.querySelector("#templateSelect"),messageText=document.querySelector("#messageText"),currentRowValue=document.querySelector("#currentRowValue"),currentPhoneValue=document.querySelector("#currentPhoneValue"),remainingCountValue=document.querySelector("#remainingCountValue"),startRowInput=document.querySelector("#startRowInput"),saveStartRow=document.querySelector("#saveStartRow"),prevRowBtn=document.querySelector("#prevRowBtn"),nextRowBtn=document.querySelector("#nextRowBtn"),openWhatsAppBtn=document.querySelector("#openWhatsAppBtn"),writeMessageBtn=document.querySelector("#writeMessageBtn"),sendCurrentMessageBtn=document.querySelector("#sendCurrentMessageBtn"),retryContactBtn=document.querySelector("#retryContactBtn"),skipContactBtn=document.querySelector("#skipContactBtn"),markManualBtn=document.querySelector("#markManualBtn"),stopProcessBtn=document.querySelector("#stopProcessBtn"),tabs=document.querySelectorAll(".tab"),tabPanels=document.querySelectorAll(".tab-panel");
+const webAppUrlInput=document.querySelector("#webAppUrl"),tokenInput=document.querySelector("#token"),sheetSelect=document.querySelector("#sheetName"),connectButton=document.querySelector("#connect"),saveButton=document.querySelector("#saveContact"),toggleToolButton=document.querySelector("#toggleTool"),statusElement=document.querySelector("#status"),versionElement=document.querySelector("#extensionVersion"),providerSheetName=document.querySelector("#providerSheetName"),phoneColumnSelect=document.querySelector("#phoneColumnSelect"),statusColumnSelect=document.querySelector("#statusColumnSelect"),lastContactColumnSelect=document.querySelector("#lastContactColumnSelect"),manualPhoneInput=document.querySelector("#manualPhoneInput"),citySelect=document.querySelector("#citySelect"),serviceTypeSelect=document.querySelector("#serviceTypeSelect"),customServiceInput=document.querySelector("#customServiceInput"),templateSelect=document.querySelector("#templateSelect"),messageText=document.querySelector("#messageText"),currentRowValue=document.querySelector("#currentRowValue"),currentPhoneValue=document.querySelector("#currentPhoneValue"),remainingCountValue=document.querySelector("#remainingCountValue"),startRowInput=document.querySelector("#startRowInput"),prevRowBtn=document.querySelector("#prevRowBtn"),nextRowBtn=document.querySelector("#nextRowBtn"),openWhatsAppBtn=document.querySelector("#openWhatsAppBtn"),sendCurrentMessageBtn=document.querySelector("#sendCurrentMessageBtn"),skipContactBtn=document.querySelector("#skipContactBtn"),markManualBtn=document.querySelector("#markManualBtn"),tabs=document.querySelectorAll(".tab"),tabPanels=document.querySelectorAll(".tab-panel");
 
 const CONTACT_STORAGE_KEY="contactWorkflow";
+let providerRows=[];
+let providerRowIndex=0;
+let currentProviderPhone="";
+let currentProviderRowNumber=0;
 
 function setStatus(text,type){statusElement.textContent=text;statusElement.className=type||""}
 function setVersion(){if(versionElement){versionElement.textContent="الإصدار: "+chrome.runtime.getManifest().version;}}
@@ -39,10 +43,18 @@ async function fillSheets(preferredSheet){
   if(!sheets.length)throw new Error("لم أجد أي شيت متاح.");
   sheetSelect.replaceChildren(...sheets.map(name=>{const option=document.createElement("option");option.value=name;option.textContent=name;return option}));
   providerSheetName.replaceChildren(...sheets.map(name=>{const option=document.createElement("option");option.value=name;option.textContent=name;return option}));
-  const saved=(await chrome.storage.sync.get("sheetName")).sheetName,target=preferredSheet||saved;
-  if(target&&sheets.includes(target))sheetSelect.value=target;
-  if(providerSheetName.value!=="" && !sheets.includes(providerSheetName.value)){providerSheetName.value=sheets[0];}
-  await chrome.storage.sync.set({sheetName:sheetSelect.value});
+
+  const saved=(await chrome.storage.sync.get("sheetName")).sheetName;
+  const target=preferredSheet || saved || sheets[0];
+  const selectedSheet = sheets.includes(target) ? target : sheets[0];
+
+  sheetSelect.value = selectedSheet;
+  providerSheetName.value = selectedSheet;
+  await chrome.storage.sync.set({sheetName:selectedSheet});
+
+  if (providerSheetName.value) {
+    await loadProviderColumns();
+  }
 }
 async function loadProviderColumns(){
   const sheetName=providerSheetName.value;
@@ -50,7 +62,12 @@ async function loadProviderColumns(){
   try{
     const result=await sendRuntimeMessage({type:"GET_SHEET_COLUMNS",sheetName:sheetName});
     const columns=result.columns || [];
+    console.log("Provider columns response:", {sheetName, columns});
     [phoneColumnSelect,statusColumnSelect,lastContactColumnSelect].forEach(select=>select.replaceChildren(new Option("اختر", "")));
+    if(!columns.length){
+      setStatus("الشيت موجود لكنه لا يحتوي على صف العناوين في الصف الأول. أضف أسماء الأعمدة في الصف الأول ثم أعد المحاولة.","error");
+      return;
+    }
     columns.forEach(col=>{
       const option = document.createElement("option");
       option.value = col;
@@ -64,8 +81,9 @@ async function loadProviderColumns(){
     if(settings.phoneColumn) phoneColumnSelect.value = settings.phoneColumn;
     if(settings.statusColumn) statusColumnSelect.value = settings.statusColumn;
     if(settings.lastContactColumn) lastContactColumnSelect.value = settings.lastContactColumn;
+    setStatus("تم جلب أعمدة الشيت بنجاح.","success");
     updateProgressUi();
-  }catch(error){setStatus(error.message,"error");}
+  }catch(error){console.error("loadProviderColumns error:", error); setStatus(error.message,"error");}
 }
 async function saveContactSettings(){
   const settings={
@@ -83,41 +101,137 @@ async function saveContactSettings(){
   await chrome.storage.local.set({providerContactSettings:settings});
   setStatus("تم حفظ إعدادات التواصل.","success");
 }
+function buildProviderMessage(){
+  const city = citySelect.value || "المدينة";
+  const service = (serviceTypeSelect.value && serviceTypeSelect.value !== "خدمة أخرى") ? serviceTypeSelect.value : (customServiceInput.value.trim() || "الخدمة");
+  const phone = currentProviderPhone || currentPhoneValue.textContent || "";
+  const text = messageText.value || "";
+  return text
+    .replace(/\{المدينة\}/gi, city)
+    .replace(/\{الخدمة\}/gi, service)
+    .replace(/\{نوع_الخدمة\}/gi, service)
+    .replace(/\{الرقم\}/gi, phone);
+}
+async function loadProviderRows(){
+  const sheetName = providerSheetName.value;
+  const phoneColumn = phoneColumnSelect.value;
+  const statusColumn = statusColumnSelect.value;
+  const lastContactColumn = lastContactColumnSelect.value;
+  if (!sheetName || !phoneColumn) return [];
+  const result = await sendRuntimeMessage({ type: "GET_ROWS", sheetName, phoneColumn, statusColumn, lastContactColumn });
+  providerRows = (result && result.rows) || [];
+  providerRowIndex = 0;
+  if (providerRows.length) {
+    currentProviderRowNumber = providerRows[0].rowNumber;
+    currentProviderPhone = providerRows[0].phone;
+    currentPhoneValue.textContent = currentProviderPhone;
+    currentRowValue.textContent = String(currentProviderRowNumber);
+    remainingCountValue.textContent = String(Math.max(providerRows.length - 1, 0));
+  } else {
+    currentProviderRowNumber = 0;
+    currentProviderPhone = "";
+    currentPhoneValue.textContent = "-";
+    currentRowValue.textContent = "0";
+    remainingCountValue.textContent = "0";
+  }
+  return providerRows;
+}
+function setCurrentProviderRow(index){
+  if (!providerRows.length) return;
+  const safeIndex = Math.max(0, Math.min(index, providerRows.length - 1));
+  providerRowIndex = safeIndex;
+  currentProviderRowNumber = providerRows[safeIndex].rowNumber;
+  currentProviderPhone = providerRows[safeIndex].phone;
+  currentPhoneValue.textContent = currentProviderPhone;
+  currentRowValue.textContent = String(currentProviderRowNumber);
+  remainingCountValue.textContent = String(Math.max(providerRows.length - safeIndex - 1, 0));
+}
+async function markCurrentRow(statusValue, noteText){
+  if (!currentProviderRowNumber || !providerSheetName.value) return;
+  const statusColumn = statusColumnSelect.value || "الحالة";
+  const lastContactColumn = lastContactColumnSelect.value || "آخر تواصل";
+  await sendRuntimeMessage({
+    type: "UPDATE_ROW_STATUS",
+    sheetName: providerSheetName.value,
+    rowNumber: currentProviderRowNumber,
+    statusColumn,
+    lastContactColumn,
+    status: statusValue,
+    lastContact: new Date().toISOString()
+  });
+  if (typeof noteText === "string" && noteText.trim()) {
+    setStatus(noteText, "success");
+  }
+  await loadProviderRows();
+}
+async function goToNextProviderRow(step){
+  if (!providerRows.length) {
+    await loadProviderRows();
+  }
+  if (!providerRows.length) {
+    setStatus("لا توجد أرقام متبقية في هذا الشيت.", "success");
+    return;
+  }
+  const nextIndex = Math.max(0, Math.min(providerRowIndex + step, providerRows.length - 1));
+  setCurrentProviderRow(nextIndex);
+  setStatus("الرقم الحالي: " + currentProviderPhone, "success");
+}
+async function startCurrentProviderWorkflow(){
+  if (!providerSheetName.value || !phoneColumnSelect.value) {
+    setStatus("اختر الشيت والعمود المناسب أولاً.", "error");
+    return;
+  }
+  if (!providerRows.length) {
+    await loadProviderRows();
+  }
+  if (!providerRows.length) {
+    setStatus("لا توجد أرقام للارسال في هذا الشيت.", "error");
+    return;
+  }
+  setCurrentProviderRow(providerRowIndex);
+  const messageTextPrepared = buildProviderMessage();
+  const url = "https://web.whatsapp.com/";
+  try {
+    const tabs = await chrome.tabs.query({ url: "https://web.whatsapp.com/*" });
+    if (tabs[0] && tabs[0].id) {
+      await chrome.tabs.update(tabs[0].id, { active: true });
+    } else {
+      await chrome.tabs.create({ url, active: true });
+    }
+    const targetTab = (await chrome.tabs.query({ url: "https://web.whatsapp.com/*" }))[0];
+    if (!targetTab || !targetTab.id) throw new Error("تعذر فتح واتساب Web.");
+    setStatus("جاري فتح محادثة جديدة والبحث عن الرقم ...", "success");
+    await chrome.tabs.sendMessage(targetTab.id, { type: "WHATSAPP_RUN_FLOW", number: currentProviderPhone, text: messageTextPrepared, confirm: true });
+    setStatus("تم إرسال الرقم والرسالة في واتساب بنجاح، الآن تحقق من الرسالة واضغط التالي إذا كانت مرتبة.", "success");
+    await markCurrentRow("تم الارسال", "تم تحديث حالة الرقم الحالي إلى تم الارسال.");
+    if (providerRows.length) {
+      providerRowIndex = Math.min(providerRows.length - 1, providerRowIndex + 1);
+      setCurrentProviderRow(providerRowIndex);
+    }
+  } catch (error) {
+    console.error("startCurrentProviderWorkflow error:", error);
+    setStatus(error.message || "تعذر تجهيز واتساب.", "error");
+  }
+}
 function bindContactControls(){
   tabs.forEach(tab=>tab.addEventListener("click",()=>setActiveTab(tab.dataset.tab)));
-  providerSheetName.addEventListener("change",async()=>{await saveContactSettings(); await loadProviderColumns();});
-  phoneColumnSelect.addEventListener("change",saveContactSettings);
+  providerSheetName.addEventListener("change",async()=>{await saveContactSettings(); await loadProviderColumns(); await loadProviderRows();});
+  phoneColumnSelect.addEventListener("change",async()=>{await saveContactSettings(); await loadProviderRows();});
   statusColumnSelect.addEventListener("change",saveContactSettings);
   lastContactColumnSelect.addEventListener("change",saveContactSettings);
+  manualPhoneInput.addEventListener("change",()=>{ if (manualPhoneInput.value.trim()) { currentProviderPhone = manualPhoneInput.value.trim(); currentPhoneValue.textContent = currentProviderPhone; setStatus("تم تعديل الرقم الحالي يدويًا.", "success"); } });
   citySelect.addEventListener("change",saveContactSettings);
   serviceTypeSelect.addEventListener("change",saveContactSettings);
   customServiceInput.addEventListener("input",saveContactSettings);
   templateSelect.addEventListener("change",saveContactSettings);
   messageText.addEventListener("input",saveContactSettings);
   startRowInput.addEventListener("change",saveContactSettings);
-  saveStartRow.addEventListener("click",async()=>{await saveContactSettings(); setStatus("تم حفظ نقطة البداية.","success");});
-  prevRowBtn.addEventListener("click",()=>{setStatus("انتقل إلى الصف السابق يدويًا من شاشة التواصل.","success");});
-  nextRowBtn.addEventListener("click",()=>{setStatus("الانتقال إلى الصف التالي سيتم بعد اختيار صف أو تأكيد المستخدم.","success");});
-  openWhatsAppBtn.addEventListener("click",async()=>{
-    const url = "https://web.whatsapp.com/";
-    try {
-      const tabs = await chrome.tabs.query({ url: "https://web.whatsapp.com/*" });
-      if (tabs[0] && tabs[0].id) {
-        await chrome.tabs.update(tabs[0].id, { active: true });
-      } else {
-        await chrome.tabs.create({ url, active: true });
-      }
-      setStatus("افتح واتساب Web يدويًا، ثم اضغط زر 'التالي' بعد فتح محادثة جديدة.","success");
-    } catch (error) {
-      setStatus(error.message || "تعذر فتح واتساب Web.","error");
-    }
-  });
-  writeMessageBtn.addEventListener("click",()=>{setStatus("اكتب الرسالة يدويًا داخل محادثة واتساب ثم اضغط 'إرسال الرسالة الحالية' بعد التأكد من النص.","success");});
-  sendCurrentMessageBtn.addEventListener("click",()=>{setStatus("إرسال الرسالة يحتاج تأكيد المستخدم فقط بعد التحقق من الرقم ومحتوى الرسالة.","success");});
-  retryContactBtn.addEventListener("click",()=>{setStatus("إعادة المحاولة مسموحة فقط بعد فشل واضح أو رقم غير مسجل في واتساب.","success");});
-  skipContactBtn.addEventListener("click",()=>{setStatus("تم تسجيل هذا الرقم كـ تخطي يدوي، مع الاحتفاظ بالصف الحالي دون تكرار.","success");});
-  markManualBtn.addEventListener("click",()=>{setStatus("تم تعليم هذا الرقم كـ إرسال يدوي، مع الحفاظ على نقطة التقدم الحالية.","success");});
-  stopProcessBtn.addEventListener("click",()=>{setStatus("تم إيقاف العملية الحالية. لا يتم إرسال أي رقم آخر دون تأكيد جديد.","error");});
+  prevRowBtn.addEventListener("click",async()=>{ if (!providerRows.length) await loadProviderRows(); if (providerRows.length) { providerRowIndex = Math.max(0, providerRowIndex - 1); setCurrentProviderRow(providerRowIndex); setStatus("الرقم الحالي: " + currentProviderPhone, "success"); } });
+  nextRowBtn.addEventListener("click",async()=>{ if (!providerRows.length) await loadProviderRows(); if (providerRows.length) { providerRowIndex = Math.min(providerRows.length - 1, providerRowIndex + 1); setCurrentProviderRow(providerRowIndex); setStatus("الرقم الحالي: " + currentProviderPhone, "success"); } });
+  openWhatsAppBtn.addEventListener("click", startCurrentProviderWorkflow);
+  sendCurrentMessageBtn.addEventListener("click",async()=>{ await markCurrentRow("تم الارسال", "تم تحديث حالة الرقم الحالي إلى تم الارسال."); providerRowIndex = Math.min(providerRows.length - 1, providerRowIndex + 1); if (providerRows.length) setCurrentProviderRow(providerRowIndex); });
+  skipContactBtn.addEventListener("click",async()=>{ await markCurrentRow("تخطي", "تم تخطي الرقم الحالي وتركه بدون تكرار."); providerRowIndex = Math.min(providerRows.length - 1, providerRowIndex + 1); if (providerRows.length) setCurrentProviderRow(providerRowIndex); });
+  markManualBtn.addEventListener("click",async()=>{ if (!manualPhoneInput.value.trim()) { setStatus("اكتب رقمًا يدويًا أولاً ثم اضغط تعديل يدوي.", "error"); return; } currentProviderPhone = manualPhoneInput.value.trim(); currentPhoneValue.textContent = currentProviderPhone; setStatus("تم تعديل الرقم الحالي يدويًا، يمكنك البدء من جديد في واتساب.", "success"); });
 }
 async function initialize(){
   const settings=await chrome.storage.sync.get(["webAppUrl","token","sheetName","toolEnabled"]);
@@ -138,7 +252,13 @@ async function initialize(){
   if(settings.webAppUrl&&settings.token){
     try{await fillSheets(settings.sheetName);setStatus("الاتصال جاهز.","success");}catch(error){setStatus(error.message,"error");}
   }
-  if(providerSheetName.value){await loadProviderColumns();}
+  if(!providerSheetName.value && sheetSelect.value){
+    providerSheetName.value = sheetSelect.value;
+  }
+  if(providerSheetName.value){
+    await loadProviderColumns();
+    await loadProviderRows();
+  }
   updateProgressUi();
 }
 connectButton.addEventListener("click",async()=>{connectButton.disabled=true;setStatus("جاري الاتصال...");try{await chrome.storage.sync.set({webAppUrl:webAppUrlInput.value.trim(),token:tokenInput.value.trim()});await fillSheets("");setStatus("تم الاتصال وجلب الشيتات.","success")}catch(error){setStatus(error.message,"error")}finally{connectButton.disabled=false}});

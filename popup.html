@@ -29,6 +29,9 @@
     <label for="lastContactColumnSelect">اختيار عمود آخر تواصل</label>
     <select id="lastContactColumnSelect"><option value="">غير موجود</option></select>
 
+    <label for="manualPhoneInput">تعديل الرقم يدويًا</label>
+    <input id="manualPhoneInput" type="text" placeholder="اكتب رقمًا إذا كان الرقم الحالي غير صحيح">
+
     <label for="citySelect">المدينة</label>
     <select id="citySelect"><option value="">كل المدن</option></select>
 
@@ -47,15 +50,11 @@
     </select>
 
     <label for="messageText">نص الرسالة</label>
-    <textarea id="messageText" rows="5">أنا مسوق لخدمات وايتات المياه وعندي عملاء يحتاجون توصيل مياه في {المدينة}
+    <textarea id="messageText" rows="5">أنا مسوق لخدمات {الخدمة} وأعمل في {المدينة}، وأستطيع توصيل الطلبات بسرعة ومتابعة التعاملات بشكل واضح.
 
-طريقة العمل بسيطة إذا جاءني طلب أرسله لك مع الموقع والتفاصيل وأنت تعطيني سعرك وبعدها أضيف عمولتي وأعرض السعر النهائي على العميل
+قد يهمك أن نبدأ من اليوم بالتعاون على الطلبات التي تأتي من مناطق {المدينة}، وسأرسل لك تفاصيل الطلب كاملة مع السعر والتنسيق مباشرة.
 
-ما راح تدفع لي أي مبلغ مقدم ولا توجد رسوم اشتراك والعمولة تكون فقط على الطلبات التي تتم فعليًا عن طريقي وتكون واضحة ومتفق عليها قبل تنفيذ الطلب
-
-إذا وافق العميل أرسل لك الموقع وعند وصولك للموقع ترسل لي وصلت وبعدها أعطيك رقم العميل للتنسيق واستلام المبلغ منه
-
-إذا الطريقة مناسبة لك رد علي بموافق ونبدأ نتعاون</textarea>
+إذا كان مناسبًا لك، راسلني في أول فرصة لنبدأ.</textarea>
 
 <div class="mini-grid">
   <div><label>رقم الصف الحالي</label><div id="currentRowValue" class="value-box">0</div></div>
@@ -65,16 +64,12 @@
 </div>
 
 <div class="action-grid">
-  <button id="saveStartRow" class="secondary">حفظ نقطة البداية</button>
   <button id="prevRowBtn" class="secondary">السابق</button>
   <button id="nextRowBtn" class="primary">التالي</button>
-  <button id="openWhatsAppBtn" class="secondary">فتح الرقم في واتساب</button>
-  <button id="writeMessageBtn" class="secondary">كتابة الرسالة</button>
-  <button id="sendCurrentMessageBtn" class="primary">إرسال الرسالة الحالية</button>
-  <button id="retryContactBtn" class="secondary">إعادة المحاولة</button>
-  <button id="skipContactBtn" class="warning">تخطي الرقم</button>
-  <button id="markManualBtn" class="secondary">تعليم كمُرسل يدويًا</button>
-  <button id="stopProcessBtn" class="danger">إيقاف العملية</button>
+  <button id="openWhatsAppBtn" class="secondary">ابدأ التواصل الحالي</button>
+  <button id="sendCurrentMessageBtn" class="primary">تم الارسال</button>
+  <button id="skipContactBtn" class="warning">تخطي</button>
+  <button id="markManualBtn" class="secondary">تعديل يدوي</button>
 </div>
   </section>
 
