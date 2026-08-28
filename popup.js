@@ -98,13 +98,26 @@ function bindContactControls(){
   saveStartRow.addEventListener("click",async()=>{await saveContactSettings(); setStatus("تم حفظ نقطة البداية.","success");});
   prevRowBtn.addEventListener("click",()=>{setStatus("انتقل إلى الصف السابق يدويًا من شاشة التواصل.","success");});
   nextRowBtn.addEventListener("click",()=>{setStatus("الانتقال إلى الصف التالي سيتم بعد اختيار صف أو تأكيد المستخدم.","success");});
-  openWhatsAppBtn.addEventListener("click",()=>{setStatus("سيتم فتح محادثة واتساب بعد التأكد من رقم الهاتف الصحيح.","success");});
-  writeMessageBtn.addEventListener("click",()=>{setStatus("سيتم كتابة الرسالة بعد فتح المحادثة الصحيحة.","success");});
-  sendCurrentMessageBtn.addEventListener("click",()=>{setStatus("إرسال الرسالة يحتاج تأكيد المستخدم قبل تحديث الشيت.","success");});
-  retryContactBtn.addEventListener("click",()=>{setStatus("إعادة المحاولة مسموحة فقط بعد فشل واضح.","success");});
-  skipContactBtn.addEventListener("click",()=>{setStatus("تم وضع الرقم في قائمة التخطي المحلية.","success");});
-  markManualBtn.addEventListener("click",()=>{setStatus("تم تعليم هذا الرقم كـ إرسال يدوي.","success");});
-  stopProcessBtn.addEventListener("click",()=>{setStatus("تم إيقاف العملية الحالية.","error");});
+  openWhatsAppBtn.addEventListener("click",async()=>{
+    const url = "https://web.whatsapp.com/";
+    try {
+      const tabs = await chrome.tabs.query({ url: "https://web.whatsapp.com/*" });
+      if (tabs[0] && tabs[0].id) {
+        await chrome.tabs.update(tabs[0].id, { active: true });
+      } else {
+        await chrome.tabs.create({ url, active: true });
+      }
+      setStatus("افتح واتساب Web يدويًا، ثم اضغط زر 'التالي' بعد فتح محادثة جديدة.","success");
+    } catch (error) {
+      setStatus(error.message || "تعذر فتح واتساب Web.","error");
+    }
+  });
+  writeMessageBtn.addEventListener("click",()=>{setStatus("اكتب الرسالة يدويًا داخل محادثة واتساب ثم اضغط 'إرسال الرسالة الحالية' بعد التأكد من النص.","success");});
+  sendCurrentMessageBtn.addEventListener("click",()=>{setStatus("إرسال الرسالة يحتاج تأكيد المستخدم فقط بعد التحقق من الرقم ومحتوى الرسالة.","success");});
+  retryContactBtn.addEventListener("click",()=>{setStatus("إعادة المحاولة مسموحة فقط بعد فشل واضح أو رقم غير مسجل في واتساب.","success");});
+  skipContactBtn.addEventListener("click",()=>{setStatus("تم تسجيل هذا الرقم كـ تخطي يدوي، مع الاحتفاظ بالصف الحالي دون تكرار.","success");});
+  markManualBtn.addEventListener("click",()=>{setStatus("تم تعليم هذا الرقم كـ إرسال يدوي، مع الحفاظ على نقطة التقدم الحالية.","success");});
+  stopProcessBtn.addEventListener("click",()=>{setStatus("تم إيقاف العملية الحالية. لا يتم إرسال أي رقم آخر دون تأكيد جديد.","error");});
 }
 async function initialize(){
   const settings=await chrome.storage.sync.get(["webAppUrl","token","sheetName","toolEnabled"]);
