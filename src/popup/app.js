@@ -1,43 +1,19 @@
-const webAppUrlInput=document.querySelector("#webAppUrl"),tokenInput=document.querySelector("#token"),sheetSelect=document.querySelector("#sheetName"),connectButton=document.querySelector("#connect"),saveButton=document.querySelector("#saveContact"),toggleToolButton=document.querySelector("#toggleTool"),statusElement=document.querySelector("#status"),versionElement=document.querySelector("#extensionVersion"),providerSheetName=document.querySelector("#providerSheetName"),phoneColumnSelect=document.querySelector("#phoneColumnSelect"),statusColumnSelect=document.querySelector("#statusColumnSelect"),lastContactColumnSelect=document.querySelector("#lastContactColumnSelect"),manualPhoneInput=document.querySelector("#manualPhoneInput"),citySelect=document.querySelector("#citySelect"),serviceTypeSelect=document.querySelector("#serviceTypeSelect"),customServiceInput=document.querySelector("#customServiceInput"),templateSelect=document.querySelector("#templateSelect"),messageText=document.querySelector("#messageText"),currentRowValue=document.querySelector("#currentRowValue"),currentPhoneValue=document.querySelector("#currentPhoneValue"),remainingCountValue=document.querySelector("#remainingCountValue"),startRowInput=document.querySelector("#startRowInput"),prevRowBtn=document.querySelector("#prevRowBtn"),nextRowBtn=document.querySelector("#nextRowBtn"),openWhatsAppBtn=document.querySelector("#openWhatsAppBtn"),sendCurrentMessageBtn=document.querySelector("#sendCurrentMessageBtn"),skipContactBtn=document.querySelector("#skipContactBtn"),markManualBtn=document.querySelector("#markManualBtn"),tabs=document.querySelectorAll(".tab"),tabPanels=document.querySelectorAll(".tab-panel");
+const {
+  webAppUrlInput, tokenInput, sheetSelect, connectButton, saveButton, toggleToolButton,
+  providerSheetName, phoneColumnSelect, statusColumnSelect, lastContactColumnSelect,
+  manualPhoneInput, citySelect, serviceTypeSelect, customServiceInput, templateSelect,
+  messageText, currentRowValue, currentPhoneValue, remainingCountValue, startRowInput,
+  prevRowBtn, nextRowBtn, openWhatsAppBtn, sendCurrentMessageBtn, skipContactBtn,
+  markManualBtn, tabs
+} = PopupDom.elements;
+const { setActiveTab, setStatus, setToolState, setVersion } = PopupDom;
+const { sendRuntimeMessage, sendTabMessage } = ChromeBridge;
 
-const CONTACT_STORAGE_KEY="contactWorkflow";
 let providerRows=[];
 let providerRowIndex=0;
 let currentProviderPhone="";
 let currentProviderRowNumber=0;
 
-function setStatus(text,type){statusElement.textContent=text;statusElement.className=type||""}
-function setVersion(){if(versionElement){versionElement.textContent="الإصدار: "+chrome.runtime.getManifest().version;}}
-function setToolState(enabled){
-  if(!toggleToolButton)return;
-  toggleToolButton.textContent=enabled?"إيقاف الأداة":"تشغيل الأداة";
-  toggleToolButton.className=enabled?"warning":"secondary";
-  toggleToolButton.dataset.enabled=enabled?"true":"false";
-}
-function setActiveTab(tabName){
-  tabs.forEach(tab=>tab.classList.toggle("active",tab.dataset.tab===tabName));
-  tabPanels.forEach(panel=>panel.classList.toggle("active",panel.dataset.panel===tabName));
-}
-function getProgressState(){return chrome.storage.local.get(CONTACT_STORAGE_KEY).then(result => result[CONTACT_STORAGE_KEY] || {});} 
-function saveProgressState(state){return chrome.storage.local.set({[CONTACT_STORAGE_KEY]: state});}
-function progressKey(){
-  const spreadsheetId=String((chrome.storage.sync.get("spreadsheetId")||{}).spreadsheetId || "");
-  const sheetName=providerSheetName.value||"";
-  const phoneColumn=phoneColumnSelect.value||"";
-  return [spreadsheetId,sheetName,phoneColumn].join("::");
-}
-function updateProgressUi(){
-  if(!currentRowValue||!currentPhoneValue||!remainingCountValue)return;
-  getProgressState().then(state=>{
-    const key=progressKey();
-    const current=state[key]||{row:1,phone:"-",remaining:0};
-    currentRowValue.textContent=String(current.row||1);
-    currentPhoneValue.textContent=current.phone||"-";
-    remainingCountValue.textContent=String(current.remaining||0);
-  });
-}
-function sendRuntimeMessage(message){return new Promise((resolve,reject)=>{chrome.runtime.sendMessage(message,response=>{if(chrome.runtime.lastError)return reject(new Error(chrome.runtime.lastError.message));if(!response||!response.ok)return reject(new Error(response&&response.error||"فشل الطلب."));resolve(response.data)})})}
-function sendTabMessage(tabId,message){return new Promise((resolve,reject)=>{chrome.tabs.sendMessage(tabId,message,response=>{if(chrome.runtime.lastError)return reject(new Error("حدّث صفحة حراج ثم حاول مرة أخرى."));if(!response||!response.ok)return reject(new Error(response&&response.error||"تعذر قراءة الصفحة."));resolve(response)})})}
 async function fillSheets(preferredSheet){
   const result=await sendRuntimeMessage({type:"GET_SHEETS"}),sheets=result.sheets||[];
   if(!sheets.length)throw new Error("لم أجد أي شيت متاح.");
@@ -82,7 +58,6 @@ async function loadProviderColumns(){
     if(settings.statusColumn) statusColumnSelect.value = settings.statusColumn;
     if(settings.lastContactColumn) lastContactColumnSelect.value = settings.lastContactColumn;
     setStatus("تم جلب أعمدة الشيت بنجاح.","success");
-    updateProgressUi();
   }catch(error){console.error("loadProviderColumns error:", error); setStatus(error.message,"error");}
 }
 async function saveContactSettings(){
@@ -106,11 +81,7 @@ function buildProviderMessage(){
   const service = (serviceTypeSelect.value && serviceTypeSelect.value !== "خدمة أخرى") ? serviceTypeSelect.value : (customServiceInput.value.trim() || "الخدمة");
   const phone = currentProviderPhone || currentPhoneValue.textContent || "";
   const text = messageText.value || "";
-  return text
-    .replace(/\{المدينة\}/gi, city)
-    .replace(/\{الخدمة\}/gi, service)
-    .replace(/\{نوع_الخدمة\}/gi, service)
-    .replace(/\{الرقم\}/gi, phone);
+  return TripleHCore.buildProviderMessage(text, { city, service, phone });
 }
 async function loadProviderRows(){
   const sheetName = providerSheetName.value;
@@ -259,10 +230,9 @@ async function initialize(){
     await loadProviderColumns();
     await loadProviderRows();
   }
-  updateProgressUi();
 }
 connectButton.addEventListener("click",async()=>{connectButton.disabled=true;setStatus("جاري الاتصال...");try{await chrome.storage.sync.set({webAppUrl:webAppUrlInput.value.trim(),token:tokenInput.value.trim()});await fillSheets("");setStatus("تم الاتصال وجلب الشيتات.","success")}catch(error){setStatus(error.message,"error")}finally{connectButton.disabled=false}});
 sheetSelect.addEventListener("change",()=>chrome.storage.sync.set({sheetName:sheetSelect.value}));
 toggleToolButton.addEventListener("click",async()=>{const enabled=toggleToolButton.dataset.enabled!=="true";await chrome.storage.sync.set({toolEnabled:enabled});setToolState(enabled);setStatus(enabled?"تم تشغيل الأداة." : "تم إيقاف الأداة.",enabled?"success":"error");});
-saveButton.addEventListener("click",async()=>{saveButton.disabled=true;setStatus("جاري فتح التواصل وقراءة الرقم...");try{const sheetName=sheetSelect.value;if(!sheetName)throw new Error("اختر الشيت أولاً.");const tabs=await chrome.tabs.query({active:true,currentWindow:true}),tab=tabs[0];if(!tab||!tab.id||!/^https:\/\/(?:[^/]+\.)?haraj\.com\.sa\//.test(tab.url||""))throw new Error("افتح إعلانًا في موقع حراج أولاً.");const contact=await sendTabMessage(tab.id,{type:"COLLECT_MOBILE"});setStatus("تم العثور على الرقم، جاري الحفظ...");const result=await sendRuntimeMessage({type:"SAVE_CONTACT",sheetName:sheetName,mobile:contact.mobile,sourceUrl:contact.sourceUrl});setStatus(result.duplicate?"الرقم "+result.mobile+" موجود مسبقًا في "+sheetName+".":"تم حفظ "+result.mobile+" في "+sheetName+".","success")}catch(error){setStatus(error.message,"error")}finally{saveButton.disabled=false}});
+saveButton.addEventListener("click",async()=>{saveButton.disabled=true;setStatus("جاري فتح التواصل وقراءة الرقم...");try{const sheetName=sheetSelect.value;if(!sheetName)throw new Error("اختر الشيت أولاً.");const tabs=await chrome.tabs.query({active:true,currentWindow:true}),tab=tabs[0];if(!tab||!tab.id||!/^https:\/\/(?:[^/]+\.)?haraj\.com\.sa\//.test(tab.url||""))throw new Error("افتح إعلانًا في موقع حراج أولاً.");const contact=await sendTabMessage(tab.id,{type:"COLLECT_MOBILE"},"حدّث صفحة حراج ثم حاول مرة أخرى.");setStatus("تم العثور على الرقم، جاري الحفظ...");const result=await sendRuntimeMessage({type:"SAVE_CONTACT",sheetName:sheetName,mobile:contact.mobile,sourceUrl:contact.sourceUrl});setStatus(result.duplicate?"الرقم "+result.mobile+" موجود مسبقًا في "+sheetName+".":"تم حفظ "+result.mobile+" في "+sheetName+".","success")}catch(error){setStatus(error.message,"error")}finally{saveButton.disabled=false}});
 initialize();

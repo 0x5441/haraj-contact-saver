@@ -1,34 +1,6 @@
 const CONTACT_BUTTON_SELECTOR = '[data-testid="post-contact"]';
 const MOBILE_SELECTOR = 'a[data-testid="contact_mobile"][href^="tel:"]';
-
-function normalizeArabicDigits(value) {
-  const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
-  const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
-  return String(value || "")
-    .replace(/[٠-٩]/g, digit => String(arabicDigits.indexOf(digit)))
-    .replace(/[۰-۹]/g, digit => String(persianDigits.indexOf(digit)));
-}
-
-function normalizeSaudiMobile(rawValue) {
-  const compact = normalizeArabicDigits(rawValue).replace(/^tel:/i, "").replace(/[^\d+]/g, "");
-  if (!compact) return null;
-
-  let mobile = compact;
-  if (mobile.startsWith("00966")) mobile = "+966" + mobile.slice(5);
-  else if (mobile.startsWith("966")) mobile = "+" + mobile;
-  else if (mobile.startsWith("05")) mobile = "+966" + mobile.slice(1);
-
-  if (!/^\+9665\d{8}$/.test(mobile)) {
-    const match = mobile.match(/(?:\+?966|00966|0)?5\d{8}/);
-    if (!match) return null;
-    mobile = match[0].replace(/[^\d+]/g, "");
-    if (mobile.startsWith("00966")) mobile = "+966" + mobile.slice(5);
-    else if (mobile.startsWith("966")) mobile = "+" + mobile;
-    else if (mobile.startsWith("05")) mobile = "+966" + mobile.slice(1);
-  }
-
-  return /^\+9665\d{8}$/.test(mobile) ? mobile : null;
-}
+const { normalizeSaudiMobile } = TripleHCore;
 
 function visibleElement(selector) {
   return Array.from(document.querySelectorAll(selector)).find(element => {

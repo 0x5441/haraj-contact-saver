@@ -1,5 +1,5 @@
-const SPREADSHEET_ID = '1hZvE6-M2Xxw20zvMI20-pDOD_LMApc4yJ7_ELKl8q7E';
-const SECRET_TOKEN = 'Haraj-2026-Sultan-9284';
+const SPREADSHEET_ID = 'ضع-معرف-ملف-Google-Sheets-هنا';
+const SECRET_TOKEN = 'ضع-التوكن-الخاص-بك-هنا';
 
 function jsonResponse_(payload){return ContentService.createTextOutput(JSON.stringify(payload)).setMimeType(ContentService.MimeType.JSON)}
 function authorize_(token){if(!token||token!==SECRET_TOKEN)throw new Error('رمز الحماية غير صحيح.');}

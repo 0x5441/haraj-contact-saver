@@ -1,1 +1,33 @@
-{"manifest_version":3,"name":"Haraj Contact Saver","version":"1.0.4","description":"يحفظ رقم التواصل من إعلان حراج في الشيت الذي تختاره، مع دعم التواصل اليدوي مع المزودين عبر واتساب.","permissions":["storage","activeTab","tabs"],"host_permissions":["https://haraj.com.sa/*","https://*.haraj.com.sa/*","https://script.google.com/*","https://script.googleusercontent.com/*","https://web.whatsapp.com/*"],"background":{"service_worker":"background.js"},"action":{"default_title":"حفظ رقم حراج","default_popup":"popup.html"},"content_scripts":[{"matches":["https://haraj.com.sa/*","https://*.haraj.com.sa/*"],"js":["content.js"],"run_at":"document_idle"},{"matches":["https://web.whatsapp.com/*"],"js":["whatsapp-content.js"],"run_at":"document_idle"}]}
+{
+  "manifest_version": 3,
+  "name": "Haraj Contact Saver",
+  "version": "1.1.0",
+  "description": "يحفظ رقم التواصل من إعلان حراج في الشيت الذي تختاره، مع دعم التواصل اليدوي مع المزودين عبر واتساب.",
+  "permissions": ["storage", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://haraj.com.sa/*",
+    "https://*.haraj.com.sa/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*",
+    "https://web.whatsapp.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/index.js"
+  },
+  "action": {
+    "default_title": "حفظ رقم حراج",
+    "default_popup": "src/popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://haraj.com.sa/*", "https://*.haraj.com.sa/*"],
+      "js": ["src/shared/core.js", "src/content/haraj/index.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["src/shared/core.js", "src/content/whatsapp/index.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

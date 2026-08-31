@@ -18,7 +18,7 @@
 
 ## النسخة الحالية
 
-- الإصدار: 1.0.3
+- الإصدار: 1.1.0
 
 ## متطلبات التشغيل
 
@@ -32,7 +32,7 @@
 2. أنشئ مشروعًا جديدًا
 3. انسخ محتوى [apps-script/Code.gs](apps-script/Code.gs) كاملًا إلى المشروع
 4. عدّل `SECRET_TOKEN` إلى رمز قوي خاص بك
-5. لا تغيّر `SPREADSHEET_ID`
+5. ضع معرّف ملف Google Sheets الخاص بك في `SPREADSHEET_ID`
 6. اضغط Deploy → New deployment → Web app
 7. اختر Execute as: Your account
 8. اختر Who has access: Anyone
@@ -62,10 +62,27 @@
 ## هيكل المشروع
 
 - `manifest.json` — إعدادات Chrome Extension
-- `background.js` — التشغيل في الخلفية والاتصال بـ Apps Script
-- `content.js` — اكتشاف رقم الهاتف داخل صفحة حراج
-- `popup.html` / `popup.js` / `popup.css` — واجهة الإضافة
-- `apps-script/Code.gs` — كود Google Apps Script
+- `src/shared/` — منطق الأرقام والقوالب والروابط المشترك
+- `src/background/` — التشغيل في الخلفية والاتصال بـ Apps Script
+- `src/content/haraj/` — استخراج رقم الهاتف من حراج
+- `src/content/whatsapp/` — تنفيذ تدفق واتساب Web
+- `src/popup/` — واجهة الإضافة والتنسيق بين الوظائف
+- `apps-script/Code.gs` — كود Google Apps Script بدون أسرار حقيقية
+- `tests/` — اختبارات المنطق المشترك
+
+التفاصيل وقواعد إضافة الخصائص موجودة في [docs/architecture.md](docs/architecture.md).
+
+## التطوير والفحص
+
+يتطلب Node.js فقط، ولا توجد حزم خارجية مطلوبة:
+
+```bash
+npm run check
+```
+
+بعد نجاح الفحص، افتح `chrome://extensions` واختر مجلد المشروع كاملًا عبر `Load unpacked`.
+
+> مهم: لا تضع التوكن الحقيقي في GitHub. التوكن يجب أن يبقى في مشروع Apps Script المنشور وفي إعدادات الإضافة فقط. إذا سبق رفع توكن إلى مستودع عام فغيّره فورًا.
 
 ## هيكل الشيت في Google Sheets
 
